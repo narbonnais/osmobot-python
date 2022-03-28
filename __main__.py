@@ -83,7 +83,8 @@ class App:
             carnet_profits.append((dollars_delta, delta, from_asset, best_input, pools, cycle))
 
         carnet_profits.sort(reverse=True)
-        cmd = build_swap_command(*carnet_profits[0])
+        dollars_delta, delta, from_asset, best_input, pools, cycle = carnet_profits[0]
+        cmd = build_swap_command(best_input, pools, cycle, account=self.config['account'])
         print(cmd)
 
     async def run(self):

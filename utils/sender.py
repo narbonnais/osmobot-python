@@ -1,8 +1,17 @@
 from typing import List
 from amm import AMM, Pool
+from utils.fetcher import fetch_raw_data
 
 
-def build_swap_command(dollars_delta, delta, from_asset, best_input, pools: List[Pool], cycle) -> str:
+def get_account_sequence(account):
+    """Fetch the account sequence from blockchain an returns it"""
+    url = f"https://osmosis.stakesystems.io/auth/accounts/{account}"
+    raw_data = fetch_raw_data(url)
+    sequence = raw_data["result"]["value"]["sequence"]
+    return sequence
+
+
+def build_swap_command(best_input, pools: List[Pool], cycle, account) -> str:
 
     for p, asset in zip(pools, cycle):
         p.set_source(asset)
@@ -12,7 +21,7 @@ def build_swap_command(dollars_delta, delta, from_asset, best_input, pools: List
     min_amount_out = amount_in
     fees = 2700
 
-    sequence = " ".join([p.complete_asset_i.denom for p in pools])
+    sequence = get_account_sequence(account)
 
     base = "osmosisd tx gamm swap-exact-amount-in "
 
