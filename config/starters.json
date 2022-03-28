@@ -1,0 +1,10 @@
+{
+    "ATOM": {
+        "maximum_input": 38200000,
+        "current_price": 27.0
+    },
+    "OSMO": {
+        "maximum_input": 9000000,
+        "current_price": 9.0
+    }
+}

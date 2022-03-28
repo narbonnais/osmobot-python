@@ -1,0 +1,9 @@
+{
+    "use_samples": false,
+    "log_data": false,
+    "minimum_dollars_delta": 3000,
+    "do_transactions": true,
+    "minimum_tx_gain": 50000,
+    "fees": 2700,
+    "account": "osmo123kgn90rmdcrhas5fu2anfvnyrhvgurlk7j4es"
+}

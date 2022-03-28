@@ -32,6 +32,8 @@ class Pool:
         self.change = None
         self.wi = None
         self.wo = None
+        self.complete_asset_i = None
+        self.complete_asset_o = None
 
         self.set_source(self.asset_1)
 
@@ -73,6 +75,8 @@ class Pool:
             self.wi = self.w1
             self.wo = self.w2
             self.change = self.change_from_1
+            self.complete_asset_i = self.complete_asset_1
+            self.complete_asset_o = self.complete_asset_2
         elif from_asset == self.asset_2:
             self.to_asset = self.asset_1
             self.from_asset = from_asset
@@ -81,6 +85,8 @@ class Pool:
             self.wi = self.w2
             self.wo = self.w1
             self.change = self.change_from_2
+            self.complete_asset_i = self.complete_asset_2
+            self.complete_asset_o = self.complete_asset_1
         else:
             raise Exception('Unknown asset')
 

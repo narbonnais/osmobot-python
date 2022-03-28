@@ -1,3 +1,9 @@
 requests
 numpy
 attrs
+scipy
+networkx
+
+# For discord bot
+discord.py
+python-dotenv
