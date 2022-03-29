@@ -11,7 +11,7 @@ def get_account_sequence(account):
     return sequence
 
 
-def build_swap_command(best_input, pools: List[Pool], cycle, account) -> str:
+def build_swap_command(best_input, pools: List[Pool], cycle, account, sequence) -> str:
 
     for p, asset in zip(pools, cycle):
         p.set_source(asset)
@@ -20,8 +20,6 @@ def build_swap_command(best_input, pools: List[Pool], cycle, account) -> str:
     amount_in = min(int(best_input), 50_000_000)
     min_amount_out = amount_in
     fees = 2700
-
-    sequence = get_account_sequence(account)
 
     base = "osmosisd tx gamm swap-exact-amount-in "
 
