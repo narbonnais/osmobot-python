@@ -1,26 +1,25 @@
 from amm.engine import find_optimal_amount
 from amm.pool import simulate_swaps
 from amm import AMM
-from utils.cycles import save_available_cycles, rotate_cycle
-from utils.sender import build_swap_command, get_account_sequence
+from utils.cycles import save_available_cycles, load_available_cycles
+from utils.sender import build_swap_command, get_account_sequence, send_cmd,  retrieve_last_transaction
 from connectors.osmosis import make_model
 from osmobot_discord.bot import Bot
+from cosmostation.CosmoStationApi import CosmoStationApi
+
 import pathlib
 import json
 import os
 import multiprocessing
 import asyncio
 from dotenv import load_dotenv
-from subprocess import Popen, PIPE
-from typing import Tuple, List, Dict
-import logging
+from typing import List, Dict
+from loguru import logger
+import sys
 
-logging.basicConfig(
-    format='%(asctime)s %(levelname)s %(message)s',
-    level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-
+logger.remove()
+logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> {level}  <level>{message}</level>",
+           level="DEBUG")
 
 maxExecutionTimeoutSeconds = 60.0
 nbCPU = multiprocessing.cpu_count()
@@ -34,6 +33,7 @@ class App:
     discordBot: Bot
     cycles: List[List[str]]
     starters: Dict[str, Dict[str, float]]
+    cosmoStationApi: CosmoStationApi
 
     def __init__(self, discord_token) -> None:
         self.base_path = str(pathlib.Path(__file__).parent.resolve())
@@ -47,20 +47,52 @@ class App:
         self.amm = make_model(regenerate=True)
         self.discordToken = discord_token
         self.discordBot = Bot()
-        self.cycles = save_available_cycles(
-            'osmosis', amm=self.amm, priorities=list(self.starters.keys()))
+        if len([]) == 1:
+            self.cycles = save_available_cycles(
+                'osmosis', amm=self.amm, priorities=list(self.starters.keys()))
+        else:
+            self.cycles = load_available_cycles('osmosis')
 
-    def reload_cycles(self):
-        self.cycles = save_available_cycles(
-            'osmosis', amm=self.amm, priorities=list(self.starters.keys()))
-
-    async def step(self):
+    def step(self):
         """
         One step equals fetching, processing, and sending transaction if needed
         """
-        logging.info("New step")
+        logger.debug('Starting a new step')
         self.amm = make_model(regenerate=False)
 
+        best_transaction = self.get_best_transaction()
+
+        if not best_transaction:
+            logger.debug(f'No good transaction')
+            return
+
+        logger.debug(f'A transaction was found : {best_transaction}')
+
+        sequence = get_account_sequence(self.config['account'])
+
+        cmd = build_swap_command(**best_transaction, sequence=sequence)
+
+        logger.debug(f'cmd successfully built : {cmd}')
+
+        txhash, stdout = send_cmd(cmd)
+
+        if txhash:
+            logger.success(f'cmd successfully sent : https://www.mintscan.io/osmosis/txs/{txhash}')
+        else:
+            logger.error(f'cmd failed')
+
+        if "insufficient fees" in stdout:
+            self.config["fees"] += 100
+
+        lastCosmoStationTx = retrieve_last_transaction(txhash, self.cosmoStationApi)
+
+        self.discordBot.sendMessageOnOsmoBotChannel(lastCosmoStationTx)
+
+    def run(self):
+        while True:
+            self.step()
+
+    def get_best_transaction(self):
         carnet_profits = []
 
         for cycle in self.cycles:
@@ -83,86 +115,29 @@ class App:
 
             delta = output - best_input
 
-            dollars_delta = float(
-                self.starters[from_asset]['current_price']) * delta
+            dollars_delta = float(self.starters[from_asset]['current_price']) * delta
+
             if dollars_delta <= self.config['minimum_dollars_delta']:
                 continue
 
-            carnet_profits.append(
-                (dollars_delta, delta, from_asset, best_input, pools, cycle))
+            transaction = {"dollars_delta": dollars_delta,
+                           "delta": delta,
+                           "from_asset": from_asset,
+                           "best_input": best_input,
+                           "pools": pools,
+                           "cycle": cycle}
 
-        carnet_profits.sort(reverse=True)
+            carnet_profits.append(transaction)
+
         if len(carnet_profits) == 0:
-            return
-        account = self.config['account']
-        sequence = get_account_sequence(account)
-        dollars_delta, delta, from_asset, best_input, pools, cycle = carnet_profits[0]
-        cmd = build_swap_command(
-            best_input, pools, cycle, account, sequence)
+            return None
 
-        # Send command using `osmosisd`
-        txLogMessage = f"Tx sent {sequence}: {round(best_input  / 1e6, 3)}\t{from_asset}\tvia pools\t[{pools}]\tfor +{round(delta  / 1e6, 3)}\t{from_asset}"
-        try:
-            logging.info(cmd)
-            p = Popen(cmd.split(" "), stdin=PIPE, stdout=PIPE)
-            stdout = p.stdout.read().decode()
-            logging.info(f"Transaction result : {stdout}")
-            hash = stdout.split("txhash: ")[1].split("\n")[0]
-            # txLogMessage = txLogMessage + f"\thash\t{hash}"
+        best_transaction = max(carnet_profits, key=lambda x: x['dollars_delta'])
 
-            # print("Hash:", hash)
-            # print(f"INFO: {step_start} - Wait for 6 seconds to let the chain stat to be updated")
+        for p, asset in zip(best_transaction['pools'], best_transaction['cycle']):
+            p.set_source(asset)
 
-            # Try to retrieve last transaction from cosmostation
-            retryCount = 10
-            lastCosmoStationTx = None
-            while retryCount > 0:
-                try:
-                    logging.debug("Try to retrieve last tx")
-                    lastCosmoStationTx = await self.cosmoStationApi.getTransactionDetailsAsync(hash)
-                    break
-                except Exception as e:
-                    logging.debug(f"{e}")
-                    await asyncio.sleep(1)
-                    pass
-
-                retryCount -= 1
-
-            # Try to retrieve last transaction from cosmostation
-
-            if "insufficient fees" in stdout:
-                self.config["fees"] += 100
-                self.totalInsufficientFeeTransactionsCount = self.totalInsufficientFeeTransactionsCount + 1
-                txLogMessage = txLogMessage + \
-                    f"\tstatus\tfailed (insufficient fees)"
-            else:
-                sequence += 1
-                # Increase transaction success count
-
-                if lastCosmoStationTx == None:
-                    self.totalSuccessTransactionsCount = self.totalSuccessTransactionsCount + 1
-                    txLogMessage = txLogMessage + f"\tstatus\tsuccess"
-                else:
-                    if lastCosmoStationTx.isSuccess:
-                        self.totalSuccessTransactionsCount = self.totalSuccessTransactionsCount + 1
-                        txLogMessage = txLogMessage + f"\tstatus\tsuccess"
-                    else:
-                        txLogMessage = txLogMessage + f"\tstatus\tfailed"
-
-            txLogMessage = txLogMessage + \
-                f"\nhttps://www.mintscan.io/osmosis/txs/{hash}"
-            
-        except Exception as e:
-            logging.error(f"{e}")
-            # print(message)
-            txLogMessage = txLogMessage + f"\tstatus\tfailed {e}"
-
-    async def run(self):
-        while True:
-            try:
-                await asyncio.wait_for(self.step(), timeout=maxExecutionTimeoutSeconds)
-            except asyncio.TimeoutError:
-                await self.discordBot.sendMessageOnOsmoBotChannel("Timeout")
+        return best_transaction
 
     async def start_discord_bot(self):
         await self.discordBot.start(self.discordToken)
@@ -172,11 +147,4 @@ if __name__ == '__main__':
     load_dotenv(dotenv_path="osmobot_discord/.env")
     token = os.getenv("TOKEN")
     app = App(token)
-
-    try:
-        loop = asyncio.get_event_loop()
-        loop.create_task(app.start_discord_bot())
-        loop.create_task(app.run())
-        loop.run_forever()
-    except KeyboardInterrupt as e:
-        print("Exited")
+    app.run()

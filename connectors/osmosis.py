@@ -117,12 +117,18 @@ def make_model(regenerate=True):
     Takes raw and details input_data, then returns the AMM model
     :param regenerate forces the call of details API instead of reading from local file
     """
+    for attempt in range(10):
+        try:
+            pools = get_pool_data_from_blockchain(regenerate)
 
-    pools = get_pool_data_from_blockchain(regenerate)
+            m_amm = AMM("osmosis", pools=pools)
 
-    m_amm = AMM("osmosis", pools=pools)
+            return m_amm
+        except Exception as e:
+            pass
 
-    return m_amm
+    raise e
+
 
 
 if __name__ == "__main__":

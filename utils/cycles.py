@@ -6,7 +6,7 @@ from typing import List
 
 
 def load_available_cycles(platform):
-    with open(f'input_data/{platform}/dynamic/cycles.pkl', 'rb') as f:
+    with open(f'input_data/dynamic/{platform}/cycles.pkl', 'rb') as f:
         cycles = pickle.load(f)
     return cycles
 

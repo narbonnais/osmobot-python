@@ -7,3 +7,5 @@ networkx
 # For discord bot
 discord.py
 python-dotenv
+python-dateutil
+loguru
