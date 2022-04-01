@@ -2,7 +2,8 @@ from amm.engine import find_optimal_amount
 from amm.pool import simulate_swaps
 from amm import AMM
 from utils.cycles import save_available_cycles, load_available_cycles
-from utils.sender import build_swap_command, get_account_sequence, send_cmd,  retrieve_last_transaction
+from utils.sender import build_swap_command, get_account_sequence, send_cmd,  retrieve_last_transaction, \
+    compute_amount_in
 from connectors.osmosis import make_model
 from osmobot_discord.bot import Bot
 from cosmostation.CosmoStationApi import CosmoStationApi
@@ -69,8 +70,8 @@ class App:
         logger.debug(f'A transaction was found : {best_transaction}')
 
         sequence = get_account_sequence(self.config['account'])
-
-        cmd = build_swap_command(**best_transaction, sequence=sequence)
+        amount_in = compute_amount_in(**best_transaction, starters=self.starters)
+        cmd = build_swap_command(**best_transaction, amount_in=amount_in, sequence=sequence)
 
         logger.debug(f'cmd successfully built : {cmd}')
 

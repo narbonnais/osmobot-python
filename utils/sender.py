@@ -3,6 +3,7 @@ from amm import AMM, Pool
 from utils.fetcher import fetch_raw_data
 import time
 from subprocess import Popen, PIPE
+import numpy as np
 
 
 def get_account_sequence(account):
@@ -13,13 +14,12 @@ def get_account_sequence(account):
     return sequence
 
 
-def build_swap_command(best_input, pools: List[Pool], cycle, sequence, **kwargs) -> str:
+def build_swap_command(amount_in, pools: List[Pool], cycle, sequence, **kwargs) -> str:
 
     for p, asset in zip(pools, cycle):
         p.set_source(asset)
 
     denom_in = pools[0].complete_asset_i.denom
-    amount_in = min(int(best_input), 50_000_000)
     min_amount_out = amount_in
     fees = 2700
 
@@ -72,4 +72,15 @@ def retrieve_last_transaction(hash, cosmo_api):
     return lastCosmoStationTx
 
 
+def compute_amount_in(best_input, pools: List[Pool], cycle, starters, **kwargs):
+    for p, asset in zip(pools, cycle):
+        p.set_source(asset)
 
+    symbol_in = pools[0].complete_asset_i.symbol
+
+    m = starters[symbol_in]['maximum_input']
+
+    # amount_in = np.round((m * best_input) / (m + best_input), 3)
+    amount_in = min(m, best_input)
+
+    return amount_in
