@@ -22,8 +22,6 @@ logger.remove()
 logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD at HH:mm:ss.SSS}</green> {level}  <level>{message}</level>",
            level="DEBUG")
 
-# nbCPU = multiprocessing.cpu_count()
-
 
 class App:
     amm: AMM
@@ -31,6 +29,7 @@ class App:
     config: dict
     cycles: List[List[str]]
     starters: Dict[str, Dict[str, float]]
+    previous_sequence: int
 
     def __init__(self) -> None:
         self.base_path = str(pathlib.Path(__file__).parent.resolve())
@@ -50,14 +49,20 @@ class App:
         else:
             self.cycles = load_available_cycles('osmosis')
 
-        self.sequence = None
+        self.previous_sequence = 0
 
     def step(self):
         """
         One step equals fetching, processing, and sending transaction if needed
         """
         logger.debug('Starting a new step')
-        self.sequence = get_account_sequence(self.config['account'])
+
+        sequence = get_account_sequence(self.config['account'])
+        if sequence == self.previous_sequence:
+            logger.debug("Waitinig for previous tx")
+            time.sleep(self.config['sleep_time'])
+            return
+
         self.amm = make_model(regenerate=False)
         logger.debug('Data fetched')
         best_transaction = self.get_best_transaction()
@@ -72,7 +77,7 @@ class App:
             **best_transaction, starters=self.starters)
 
         cmd = build_swap_command(
-            **best_transaction, amount_in=amount_in, sequence=self.sequence)
+            **best_transaction, amount_in=amount_in, sequence=sequence)
 
         logger.debug(f'cmd successfully built : {cmd}')
 
@@ -83,6 +88,7 @@ class App:
             if txhash:
                 logger.success(
                     f'cmd successfully sent : https://www.mintscan.io/osmosis/txs/{txhash}')
+                self.previous_sequence = sequence
             else:
                 logger.error(f'cmd failed')
 
