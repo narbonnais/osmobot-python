@@ -1,0 +1,6 @@
+minimum_dollars_delta: 300
+do_transactions: false
+regenerate_cycles: true
+regenerate_denom2symbol: true
+fees: 2700
+account: "osmo123kgn90rmdcrhas5fu2anfvnyrhvgurlk7j4es"

@@ -6,6 +6,8 @@ import os
 from utils import fetch_raw_data
 from amm import AMM, Pool, Asset
 
+from loguru import logger
+
 script_dir = os.path.dirname(__file__)
 
 
@@ -68,11 +70,10 @@ def get_pool_data_from_blockchain(regenerate) -> List[Pool]:
         lcd_asset_1 = lcd_pool.assets[0]
         lcd_asset_2 = lcd_pool.assets[1]
 
-        symbol_1 = denom_to_symbol[lcd_asset_1.token_denom]
-        symbol_2 = denom_to_symbol[lcd_asset_2.token_denom]
+        symbol_1 = denom_to_symbol.get(lcd_asset_1.token_denom, '')
+        symbol_2 = denom_to_symbol.get(lcd_asset_2.token_denom, '')
 
         # TODO : Improve these dirty filters
-
         if symbol_1 == '' or symbol_2 == '':
             continue
 
@@ -80,10 +81,10 @@ def get_pool_data_from_blockchain(regenerate) -> List[Pool]:
                 lcd_asset_1.token_amount + lcd_asset_2.token_amount > 1e21:
             continue
 
-        asset_1 = Asset(symbol=denom_to_symbol[lcd_asset_1.token_denom], denom=lcd_asset_1.token_denom,
+        asset_1 = Asset(symbol=symbol_1, denom=lcd_asset_1.token_denom,
                         amount=lcd_asset_1.token_amount, weight=lcd_asset_1.weight, decimals=6)
 
-        asset_2 = Asset(symbol=denom_to_symbol[lcd_asset_2.token_denom], denom=lcd_asset_2.token_denom,
+        asset_2 = Asset(symbol=symbol_2, denom=lcd_asset_2.token_denom,
                         amount=lcd_asset_2.token_amount, weight=lcd_asset_2.weight, decimals=6)
 
         pools.append(Pool(idx=lcd_pool.id, swap_fee=lcd_pool.swap_fee,
@@ -92,21 +93,31 @@ def get_pool_data_from_blockchain(regenerate) -> List[Pool]:
     return pools
 
 
-def get_pool_additional_details(regenerate=True) -> Dict[str, str]:
+def get_pool_additional_details(regenerate) -> Dict[str, str]:
     """Read input_data from API, returns pool details input_data"""
 
     # Fetch and store input_data
     local_file = script_dir + "/../input_data/dynamic/osmosis/denom_to_symbol.json"
     if regenerate:
-        details_url = "https://api-osmosis.imperator.co/search/v1/pools"
-        details_data = fetch_raw_data(details_url)
-        denom_to_symbol: Dict[str, str] = {}
-        for assets in details_data.values():
-            for asset in assets:
-                if asset['denom'] not in denom_to_symbol:
-                    denom_to_symbol[asset['denom']] = asset['symbol']
-        with open(local_file, "w+") as f:
-            f.write(json.dumps(denom_to_symbol, indent=4))
+        try:
+            details_url = "https://api-osmosis.imperator.co/search/v1/pools"
+            details_data = fetch_raw_data(details_url)
+            denom_to_symbol: Dict[str, str] = {}
+            for assets in details_data.values():
+                for asset in assets:
+                    if asset['denom'] not in denom_to_symbol:
+                        denom_to_symbol[asset['denom']] = asset['symbol']
+            with open(local_file, "w+") as f:
+                f.write(json.dumps(denom_to_symbol, indent=4))
+
+        except Exception as e:
+            logger.warning(f'https://api-osmosis.imperator.co/search/v1/pools is down. Attempting Fetch denom_to_symbol'
+                           f' from local file')
+
+            with open(local_file, "r") as f:
+                denom_to_symbol = json.loads(f.read())
+
+            return denom_to_symbol
     else:
         with open(local_file, "r") as f:
             denom_to_symbol = json.loads(f.read())

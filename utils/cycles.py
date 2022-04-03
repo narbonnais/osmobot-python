@@ -1,6 +1,6 @@
 import pickle
 import networkx as nx
-from amm import AMM, Pool
+from amm import AMM
 import os
 from typing import List
 

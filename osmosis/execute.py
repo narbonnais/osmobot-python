@@ -1,9 +1,7 @@
 from typing import List
-from amm import AMM, Pool
+from amm import Pool
 from utils.fetcher import fetch_raw_data
-import time
 from subprocess import Popen, PIPE
-import numpy as np
 
 
 def get_account_sequence(account):
@@ -47,40 +45,10 @@ def build_swap_command(amount_in, pools: List[Pool], cycle, sequence, **kwargs) 
 
 
 def send_cmd(cmd):
-    # logging.info(cmd)
     p = Popen(cmd.split(" "), stdin=PIPE, stdout=PIPE)
     stdout = p.stdout.read().decode()
-    # logging.info(f"Transaction result : {stdout}")
     if 'txhash' in stdout:
         hash = stdout.split("txhash: ")[1].split("\n")[0]
     else:
         hash = None
     return hash, stdout
-
-
-def retrieve_last_transaction(hash, cosmo_api):
-    # Try to retrieve last transaction from cosmostation
-    retryCount = 10
-    lastCosmoStationTx = None
-    while retryCount > 0:
-        try:
-            lastCosmoStationTx = cosmo_api.getTransactionDetails(hash)
-            break
-        except Exception as e:
-            time.sleep(1)
-            retryCount -= 1
-    return lastCosmoStationTx
-
-
-def compute_amount_in(best_input, pools: List[Pool], cycle, starters, **kwargs):
-    for p, asset in zip(pools, cycle):
-        p.set_source(asset)
-
-    symbol_in = pools[0].complete_asset_i.symbol
-
-    m = starters[symbol_in]['maximum_input']
-
-    # amount_in = np.round((m * best_input) / (m + best_input), 3)
-    amount_in = min(m, best_input)
-
-    return amount_in

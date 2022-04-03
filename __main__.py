@@ -1,57 +1,48 @@
 from utils.cycles import save_available_cycles, load_available_cycles
+from utils.amount import compute_amount_in
 
 from amm.engine import find_optimal_amount
 from amm.pool import simulate_swaps
 from amm import AMM
 
 from osmosis.query import make_model
-from osmosis.execute import build_swap_command, get_account_sequence, send_cmd,  retrieve_last_transaction, \
-    compute_amount_in
-
-from cosmostation.CosmoStationApi import CosmoStationApi
-
+from osmosis.execute import build_swap_command, get_account_sequence, send_cmd
 
 import pathlib
-import json
-import os
-import multiprocessing
-import asyncio
-from dotenv import load_dotenv
+import yaml
+
 from typing import List, Dict
 from loguru import logger
 import sys
 
+import requests
+
 logger.remove()
-logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> {level}  <level>{message}</level>",
+logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD at HH:mm:ss.SSS}</green> {level}  <level>{message}</level>",
            level="DEBUG")
 
-maxExecutionTimeoutSeconds = 60.0
-nbCPU = multiprocessing.cpu_count()
+# nbCPU = multiprocessing.cpu_count()
 
 
 class App:
     amm: AMM
     base_path: str
     config: dict
-    discordToken: str
-    discordBot: Bot
     cycles: List[List[str]]
     starters: Dict[str, Dict[str, float]]
-    cosmoStationApi: CosmoStationApi
 
-    def __init__(self, discord_token) -> None:
+    def __init__(self) -> None:
         self.base_path = str(pathlib.Path(__file__).parent.resolve())
 
-        with open(f"{self.base_path}/config/config.json", "r") as f:
-            self.config = json.loads(f.read())
+        with open(f"{self.base_path}/config/config.yaml", "r") as f:
+            self.config = yaml.safe_load(f)
 
-        with open(f"{self.base_path}/config/starters.json", "r") as f:
-            self.starters = json.loads(f.read())
+        with open(f"{self.base_path}/config/starters.yaml", "r") as f:
+            self.starters = yaml.safe_load(f)
 
-        self.amm = make_model(regenerate=True)
-        self.discordToken = discord_token
-        self.discordBot = Bot()
-        if len([]) == 1:
+        self.amm = make_model(regenerate=self.config['regenerate_denom2symbol'])
+
+        if self.config['regenerate_cycles']:
             self.cycles = save_available_cycles(
                 'osmosis', amm=self.amm, priorities=list(self.starters.keys()))
         else:
@@ -63,7 +54,7 @@ class App:
         """
         logger.debug('Starting a new step')
         self.amm = make_model(regenerate=False)
-
+        logger.debug('Data fetched')
         best_transaction = self.get_best_transaction()
 
         if not best_transaction:
@@ -73,28 +64,29 @@ class App:
         logger.debug(f'A transaction was found : {best_transaction}')
 
         sequence = get_account_sequence(self.config['account'])
+
         amount_in = compute_amount_in(
             **best_transaction, starters=self.starters)
+
         cmd = build_swap_command(
             **best_transaction, amount_in=amount_in, sequence=sequence)
 
         logger.debug(f'cmd successfully built : {cmd}')
 
-        txhash, stdout = send_cmd(cmd)
+        if self.config["do_transactions"]:
 
-        if txhash:
-            logger.success(
-                f'cmd successfully sent : https://www.mintscan.io/osmosis/txs/{txhash}')
-        else:
-            logger.error(f'cmd failed')
+            txhash, stdout = send_cmd(cmd)
 
-        if "insufficient fees" in stdout:
-            self.config["fees"] += 100
+            if txhash:
+                logger.success(
+                    f'cmd successfully sent : https://www.mintscan.io/osmosis/txs/{txhash}')
+            else:
+                logger.error(f'cmd failed')
 
-        lastCosmoStationTx = retrieve_last_transaction(
-            txhash, self.cosmoStationApi)
+            if "insufficient fees" in stdout:
+                self.config["fees"] += 100
 
-        self.discordBot.sendMessageOnOsmoBotChannel(lastCosmoStationTx)
+            requests.post(url="http://127.0.0.1:5000/arbitrages/osmosis", data={"hash": txhash})
 
     def run(self):
         while True:
@@ -149,12 +141,7 @@ class App:
 
         return best_transaction
 
-    async def start_discord_bot(self):
-        await self.discordBot.start(self.discordToken)
-
 
 if __name__ == '__main__':
-    load_dotenv(dotenv_path="osmobot_discord/.env")
-    token = os.getenv("TOKEN")
-    app = App(token)
+    app = App()
     app.run()
