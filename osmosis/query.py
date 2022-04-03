@@ -47,7 +47,8 @@ class LCDPool:
 def get_pool_data_from_blockchain(regenerate) -> List[Pool]:
     """Read input_data from API, returns pools input_data"""
 
-    local_file = os.path.join(script_dir, "../input_data/dynamic/osmosis/lcd_data.json")
+    local_file = os.path.join(
+        script_dir, "../input_data/dynamic/osmosis/lcd_data.json")
     pools_url = "https://lcd-osmosis.keplr.app/osmosis/gamm/v1beta1/pools?pagination.limit=750"
 
     # Fetch and store input_data
@@ -85,7 +86,8 @@ def get_pool_data_from_blockchain(regenerate) -> List[Pool]:
         asset_2 = Asset(symbol=denom_to_symbol[lcd_asset_2.token_denom], denom=lcd_asset_2.token_denom,
                         amount=lcd_asset_2.token_amount, weight=lcd_asset_2.weight, decimals=6)
 
-        pools.append(Pool(idx=lcd_pool.id, swap_fee=lcd_pool.swap_fee, asset_1=asset_1, asset_2=asset_2))
+        pools.append(Pool(idx=lcd_pool.id, swap_fee=lcd_pool.swap_fee,
+                     asset_1=asset_1, asset_2=asset_2))
 
     return pools
 
@@ -128,7 +130,6 @@ def make_model(regenerate=True):
             pass
 
     raise e
-
 
 
 if __name__ == "__main__":

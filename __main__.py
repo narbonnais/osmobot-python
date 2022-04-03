@@ -1,12 +1,15 @@
+from utils.cycles import save_available_cycles, load_available_cycles
+
 from amm.engine import find_optimal_amount
 from amm.pool import simulate_swaps
 from amm import AMM
-from utils.cycles import save_available_cycles, load_available_cycles
-from utils.sender import build_swap_command, get_account_sequence, send_cmd,  retrieve_last_transaction, \
+
+from osmosis.query import make_model
+from osmosis.execute import build_swap_command, get_account_sequence, send_cmd,  retrieve_last_transaction, \
     compute_amount_in
-from connectors.osmosis import make_model
-from osmobot_discord.bot import Bot
+
 from cosmostation.CosmoStationApi import CosmoStationApi
+
 
 import pathlib
 import json
@@ -19,7 +22,7 @@ from loguru import logger
 import sys
 
 logger.remove()
-logger.add(sys.stderr, format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> {level}  <level>{message}</level>",
+logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD at HH:mm:ss}</green> {level}  <level>{message}</level>",
            level="DEBUG")
 
 maxExecutionTimeoutSeconds = 60.0
@@ -70,22 +73,26 @@ class App:
         logger.debug(f'A transaction was found : {best_transaction}')
 
         sequence = get_account_sequence(self.config['account'])
-        amount_in = compute_amount_in(**best_transaction, starters=self.starters)
-        cmd = build_swap_command(**best_transaction, amount_in=amount_in, sequence=sequence)
+        amount_in = compute_amount_in(
+            **best_transaction, starters=self.starters)
+        cmd = build_swap_command(
+            **best_transaction, amount_in=amount_in, sequence=sequence)
 
         logger.debug(f'cmd successfully built : {cmd}')
 
         txhash, stdout = send_cmd(cmd)
 
         if txhash:
-            logger.success(f'cmd successfully sent : https://www.mintscan.io/osmosis/txs/{txhash}')
+            logger.success(
+                f'cmd successfully sent : https://www.mintscan.io/osmosis/txs/{txhash}')
         else:
             logger.error(f'cmd failed')
 
         if "insufficient fees" in stdout:
             self.config["fees"] += 100
 
-        lastCosmoStationTx = retrieve_last_transaction(txhash, self.cosmoStationApi)
+        lastCosmoStationTx = retrieve_last_transaction(
+            txhash, self.cosmoStationApi)
 
         self.discordBot.sendMessageOnOsmoBotChannel(lastCosmoStationTx)
 
@@ -116,7 +123,8 @@ class App:
 
             delta = output - best_input
 
-            dollars_delta = float(self.starters[from_asset]['current_price']) * delta
+            dollars_delta = float(
+                self.starters[from_asset]['current_price']) * delta
 
             if dollars_delta <= self.config['minimum_dollars_delta']:
                 continue
@@ -133,7 +141,8 @@ class App:
         if len(carnet_profits) == 0:
             return None
 
-        best_transaction = max(carnet_profits, key=lambda x: x['dollars_delta'])
+        best_transaction = max(
+            carnet_profits, key=lambda x: x['dollars_delta'])
 
         for p, asset in zip(best_transaction['pools'], best_transaction['cycle']):
             p.set_source(asset)
