@@ -13,4 +13,4 @@ def compute_amount_in(best_input, pools: List[Pool], cycle, starters, **kwargs):
     # amount_in = np.round((m * best_input) / (m + best_input), 3)
     amount_in = min(m, best_input)
 
-    return amount_in
+    return int(amount_in)

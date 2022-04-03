@@ -16,6 +16,7 @@ from loguru import logger
 import sys
 
 import requests
+import time
 
 logger.remove()
 logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD at HH:mm:ss.SSS}</green> {level}  <level>{message}</level>",
@@ -40,7 +41,8 @@ class App:
         with open(f"{self.base_path}/config/starters.yaml", "r") as f:
             self.starters = yaml.safe_load(f)
 
-        self.amm = make_model(regenerate=self.config['regenerate_denom2symbol'])
+        self.amm = make_model(
+            regenerate=self.config['regenerate_denom2symbol'])
 
         if self.config['regenerate_cycles']:
             self.cycles = save_available_cycles(
@@ -48,11 +50,14 @@ class App:
         else:
             self.cycles = load_available_cycles('osmosis')
 
+        self.sequence = None
+
     def step(self):
         """
         One step equals fetching, processing, and sending transaction if needed
         """
         logger.debug('Starting a new step')
+        self.sequence = get_account_sequence(self.config['account'])
         self.amm = make_model(regenerate=False)
         logger.debug('Data fetched')
         best_transaction = self.get_best_transaction()
@@ -63,13 +68,11 @@ class App:
 
         logger.debug(f'A transaction was found : {best_transaction}')
 
-        sequence = get_account_sequence(self.config['account'])
-
         amount_in = compute_amount_in(
             **best_transaction, starters=self.starters)
 
         cmd = build_swap_command(
-            **best_transaction, amount_in=amount_in, sequence=sequence)
+            **best_transaction, amount_in=amount_in, sequence=self.sequence)
 
         logger.debug(f'cmd successfully built : {cmd}')
 
@@ -86,7 +89,10 @@ class App:
             if "insufficient fees" in stdout:
                 self.config["fees"] += 100
 
-            requests.post(url="http://127.0.0.1:5000/arbitrages/osmosis", data={"hash": txhash})
+            requests.post(
+                url="http://127.0.0.1:5000/arbitrages/osmosis", data={"hash": txhash})
+
+            time.sleep(self.config["sleep_time"])
 
     def run(self):
         while True:
