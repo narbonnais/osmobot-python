@@ -59,7 +59,7 @@ class App:
 
         sequence = get_account_sequence(self.config['account'])
         if sequence == self.previous_sequence:
-            logger.debug("Waitinig for previous tx")
+            logger.debug("Waiting for previous tx")
             time.sleep(self.config['sleep_time'])
             return
 
@@ -97,8 +97,6 @@ class App:
 
             requests.post(
                 url="http://127.0.0.1:5000/arbitrages/osmosis", data={"hash": txhash})
-
-            time.sleep(self.config["sleep_time"])
 
     def run(self):
         while True:
