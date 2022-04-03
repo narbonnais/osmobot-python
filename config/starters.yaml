@@ -3,5 +3,5 @@ ATOM:
     current_price: 31.0
 
 OSMO:
-    maximum_input: 30000000
+    maximum_input: 6000000
     current_price: 9.0
