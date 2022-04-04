@@ -1,6 +1,6 @@
 # Osmosis python arbitrage bot
 
-This bot gets data from osmosis liquidity pools and computes the best routes to perform arbitrage and make profit. It comes with a [discord bot](osmobot_discord/Readme.md) that can be used to monitor the bot's status and profits. 
+This bot gets data from osmosis liquidity pools and computes the best routes to perform arbitrage and make profit. It comes with a [discord bot](https://github.com/Alecsis/discord-bot) that can be used to monitor the bot's status and profits. 
 
 ## Quickstart
 
