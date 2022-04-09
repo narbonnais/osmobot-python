@@ -51,7 +51,9 @@ def get_pool_data_from_blockchain(regenerate) -> List[Pool]:
 
     local_file = os.path.join(
         script_dir, "../input_data/dynamic/osmosis/lcd_data.json")
-    pools_url = "https://lcd-osmosis.keplr.app/osmosis/gamm/v1beta1/pools?pagination.limit=750"
+
+    # pools_url = "https://lcd-osmosis.keplr.app/osmosis/gamm/v1beta1/pools?pagination.limit=750"
+    pools_url = "https://osmosis.stakesystems.io/osmosis/gamm/v1beta1/pools?pagination.limit=1000&pagination.count_total=true"
 
     # Fetch and store input_data
     pools_data = fetch_raw_data(pools_url)
@@ -81,14 +83,20 @@ def get_pool_data_from_blockchain(regenerate) -> List[Pool]:
                 lcd_asset_1.token_amount + lcd_asset_2.token_amount > 1e21:
             continue
 
-        asset_1 = Asset(symbol=symbol_1, denom=lcd_asset_1.token_denom,
-                        amount=lcd_asset_1.token_amount, weight=lcd_asset_1.weight, decimals=6)
+        asset_1 = Asset(symbol=symbol_1, denom=lcd_asset_1.token_denom)
 
-        asset_2 = Asset(symbol=symbol_2, denom=lcd_asset_2.token_denom,
-                        amount=lcd_asset_2.token_amount, weight=lcd_asset_2.weight, decimals=6)
+        amount_1 = lcd_asset_1.token_amount
+        w1 = lcd_asset_1.weight
 
-        pools.append(Pool(idx=lcd_pool.id, swap_fee=lcd_pool.swap_fee,
-                     asset_1=asset_1, asset_2=asset_2))
+        asset_2 = Asset(symbol=symbol_2, denom=lcd_asset_2.token_denom)
+        amount_2 = lcd_asset_2.token_amount
+        w2 = lcd_asset_2.weight
+
+        pools.append(Pool(idx=lcd_pool.id, swap_fee=lcd_pool.swap_fee, asset_1=asset_1, asset_2=asset_2,
+                          amount_in=amount_1, amount_out=amount_2, wi=w1, wo=w2))
+
+        pools.append(Pool(idx=lcd_pool.id, swap_fee=lcd_pool.swap_fee, asset_1=asset_2, asset_2=asset_1,
+                          amount_in=amount_2, amount_out=amount_1, wi=w2, wo=w1))
 
     return pools
 

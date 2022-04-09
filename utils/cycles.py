@@ -16,8 +16,8 @@ def save_available_cycles(platform, amm: AMM, priorities: List[str]):
 
     for p in amm.pools.values():
 
-        G.add_edge(p.asset_1, p.asset_2)
-        G.add_edge(p.asset_2, p.asset_1)
+        G.add_edge(p.symbol_1, p.symbol_2)
+        G.add_edge(p.symbol_2, p.symbol_1)
 
     cycles = list(nx.simple_cycles(G))
 

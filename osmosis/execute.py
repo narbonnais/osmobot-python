@@ -12,14 +12,10 @@ def get_account_sequence(account):
     return sequence
 
 
-def build_swap_command(amount_in, pools: List[Pool], cycle, sequence, **kwargs) -> str:
-
-    for p, asset in zip(pools, cycle):
-        p.set_source(asset)
-
-    denom_in = pools[0].complete_asset_i.denom
+def build_swap_command(transaction, amount_in, sequence, fees) -> str:
+    """Builds the command to send to the blockchain"""
+    denom_in = transaction.pools[0].asset_1.denom
     min_amount_out = amount_in
-    fees = 2700
 
     base = "osmosisd tx gamm swap-exact-amount-in "
 
@@ -34,9 +30,9 @@ def build_swap_command(amount_in, pools: List[Pool], cycle, sequence, **kwargs) 
 
     # Add each route
     var = ""
-    for pool in pools:
+    for pool in transaction.pools:
         pool_id = pool.idx
-        denom_out = pool.complete_asset_o.denom
+        denom_out = pool.asset_2.denom
         var += f"--swap-route-pool-ids={pool_id} --swap-route-denoms={denom_out} "
 
     # Assemble cmd line

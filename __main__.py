@@ -1,8 +1,7 @@
 from utils.cycles import save_available_cycles, load_available_cycles
 from utils.amount import compute_amount_in
 
-from amm.engine import find_optimal_amount
-from amm.pool import simulate_swaps
+from amm.engine import find_transactions
 from amm import AMM
 
 from osmosis.query import make_model
@@ -10,11 +9,12 @@ from osmosis.execute import build_swap_command, get_account_sequence, send_cmd
 
 import pathlib
 import yaml
-
 from typing import List, Dict
 from loguru import logger
 import sys
-
+import multiprocessing as mp
+from functools import partial
+import itertools
 import requests
 import time
 
@@ -65,19 +65,27 @@ class App:
 
         self.amm = make_model(regenerate=False)
         logger.debug('Data fetched')
-        best_transaction = self.get_best_transaction()
 
-        if not best_transaction:
-            logger.debug(f'No good transaction')
+        # with mp.Pool(processes=5) as p:
+        #     txs = p.map(partial(find_transactions, amm=self.amm, config=self.config, starters=self.starters),
+        #                 self.cycles)
+        #
+        # txs = list(itertools.chain(*txs))
+
+        txs = []
+        for cycle in self.cycles:
+            txs += find_transactions(amm=self.amm, config=self.config, starters=self.starters, cycle=cycle)
+
+        if len(txs) == 0:
+            logger.debug('No transaction found')
             return
 
+        best_transaction = max(txs)
         logger.debug(f'A transaction was found : {best_transaction}')
 
-        amount_in = compute_amount_in(
-            **best_transaction, starters=self.starters)
+        amount_in = compute_amount_in(best_transaction, starters=self.starters)
 
-        cmd = build_swap_command(
-            **best_transaction, amount_in=amount_in, sequence=sequence)
+        cmd = build_swap_command(best_transaction, amount_in=amount_in, sequence=sequence, fees=self.config['fees'])
 
         logger.debug(f'cmd successfully built : {cmd}')
 
@@ -101,55 +109,6 @@ class App:
     def run(self):
         while True:
             self.step()
-
-    def get_best_transaction(self):
-        carnet_profits = []
-
-        for cycle in self.cycles:
-            change, pools = self.amm.compute_cycle(cycle)
-
-            if change < 0:
-                continue
-
-            from_asset = cycle[0]
-
-            for p, asset in zip(pools, cycle):
-                p.set_source(asset)
-
-            best_input = find_optimal_amount(pools, from_asset)
-
-            if best_input <= 0:
-                continue
-
-            output = simulate_swaps(pools, from_asset, best_input)[1]
-
-            delta = output - best_input
-
-            dollars_delta = float(
-                self.starters[from_asset]['current_price']) * delta
-
-            if dollars_delta <= self.config['minimum_dollars_delta']:
-                continue
-
-            transaction = {"dollars_delta": dollars_delta,
-                           "delta": delta,
-                           "from_asset": from_asset,
-                           "best_input": best_input,
-                           "pools": pools,
-                           "cycle": cycle}
-
-            carnet_profits.append(transaction)
-
-        if len(carnet_profits) == 0:
-            return None
-
-        best_transaction = max(
-            carnet_profits, key=lambda x: x['dollars_delta'])
-
-        for p, asset in zip(best_transaction['pools'], best_transaction['cycle']):
-            p.set_source(asset)
-
-        return best_transaction
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@ from amm.pool import Pool
 import numpy as np
 from typing import List
 from amm.asset import Asset
+import itertools
 
 
 class AMM:
@@ -9,7 +10,8 @@ class AMM:
         self.name = name
         self.symbol_to_denom = {}  # asset_symbol --> asset_denom
         self.pools = {}   # pool_id  --> Pool
-        self.graph = {}   # asset_source --> [  (pool_1, asset_symbol_dest_1) , (pool_2, asset_symbol_dest_2), ... ]
+        self.graph = {}   # asset_symbol --> [  (pool_1, asset_symbol_dest_1) , (pool_2, asset_symbol_dest_2), ... ]
+        self.assets = {}  # asset_symbol --> Asset
         self.num_assets = 0
         self.num_pools = 0
 
@@ -19,6 +21,7 @@ class AMM:
     def add_asset(self, asset: Asset):
         if asset.symbol not in self.graph:
             self.graph[asset.symbol] = []
+            self.assets[asset.symbol] = asset
             self.num_assets += 1
 
         if asset.symbol not in self.symbol_to_denom:
@@ -29,43 +32,46 @@ class AMM:
             self.pools[pool.idx] = pool
             self.num_pools += 1
 
-        asset_1 = pool.complete_asset_1
-        asset_2 = pool.complete_asset_2
+        symbol_1 = pool.symbol_1
+        symbol_2 = pool.symbol_2
 
-        self.add_asset(asset_1)
-        self.add_asset(asset_2)
+        self.add_asset(pool.asset_1)
+        self.add_asset(pool.asset_2)
 
-        self.graph[asset_1.symbol].append((pool, asset_2.symbol))
-        self.graph[asset_2.symbol].append((pool, asset_1.symbol))
+        self.graph[symbol_1].append((pool, symbol_2))
 
-    def compute_cycle(self, cycle: List[str]) -> (float, List[Pool]):
+    def compute_cycle(self, cycle: List[str]) -> float:
         """
         Compute the cycle maximum change rate for the given cycle
         return :
            - change:         Cycle best change rate
-           - list_of_pools:  list of pools to get the best change rate
         """
 
         if cycle[-1] != cycle[0]:
             cycle = cycle + [cycle[0]]
 
         change = 0
-        pools = []
 
         for start, end in zip(cycle[:-1], cycle[1:]):
             available_pools = [link[0] for link in self.graph[start] if link[1] == end]
 
             max_change = -np.inf
-            best_pool = None
 
             for pool in available_pools:
-                pool.set_source(start)
-
                 # If the change rate is better in this pool
                 if pool.change > max_change:
-                    best_pool = pool
                     max_change = pool.change
 
             change += max_change
-            pools.append(best_pool)
-        return change, pools
+        return change
+
+    def all_pools_with_cycle(self, cycle: List[str]) -> List[List[Pool]]:
+        if cycle[-1] != cycle[0]:
+            cycle = cycle + [cycle[0]]
+
+        list_of_pools = []
+        for start, end in zip(cycle[:-1], cycle[1:]):
+            available_pools = [link[0] for link in self.graph[start] if link[1] == end]
+            list_of_pools.append(available_pools)
+
+        return list(map(list, itertools.product(*list_of_pools)))
