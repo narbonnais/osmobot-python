@@ -12,7 +12,7 @@ def simulate_swaps(pools: List[Pool], amount: float):
 
 def find_optimal_amount(pools: List[Pool], xatol=10000, fatol=100):
 
-    if all([p.wi == p.wo for p in pools]):
+    if all([p.wi == p.wo for p in pools]) and all([p.pool_type == 'xyk' for p in pools]):
         p1 = pools[0]
 
         i_eq = p1.i

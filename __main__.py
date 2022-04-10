@@ -14,6 +14,11 @@ from terraswap.execute import build_swap_command as ts_build_swap_command
 from terraswap.execute import send_cmd as ts_send_cmd
 from terraswap.execute import get_account_sequence as ts_get_account_sequence
 
+from astroport.query import make_model as as_make_model
+from astroport.execute import build_swap_command as as_build_swap_command
+from astroport.execute import send_cmd as as_send_cmd
+from astroport.execute import get_account_sequence as as_get_account_sequence
+
 import pathlib
 import yaml
 from typing import List, Dict
@@ -25,10 +30,11 @@ import itertools
 import requests
 import time
 
-models = {"osmosis": os_make_model, "terraswap": ts_make_model}
-commands = {"osmosis": os_build_swap_command, "terraswap": ts_build_swap_command}
-senders = {"osmosis": os_send_cmd, "terraswap": ts_send_cmd}
-sequences = {"osmosis": os_get_account_sequence, "terraswap": ts_get_account_sequence}
+models = {"osmosis": os_make_model, "terraswap": ts_make_model, "astroport": as_make_model}
+commands = {"osmosis": os_build_swap_command, "terraswap": ts_build_swap_command, "astroport": as_build_swap_command}
+senders = {"osmosis": os_send_cmd, "terraswap": ts_send_cmd, "astroport": as_send_cmd}
+sequences = {"osmosis": os_get_account_sequence, "terraswap": ts_get_account_sequence,
+             "astroport": as_get_account_sequence}
 
 logger.remove()
 logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD at HH:mm:ss.SSS}</green> {level}  <level>{message}</level>",
@@ -84,12 +90,6 @@ class App:
         self.amm = make_model(regenerate=False)
         logger.debug('Data fetched')
 
-        # with mp.Pool(processes=5) as p:
-        #     txs = p.map(partial(find_transactions, amm=self.amm, config=self.config, starters=self.starters),
-        #                 self.cycles)
-        #
-        # txs = list(itertools.chain(*txs))
-
         txs = []
         for cycle in self.cycles:
             txs += find_transactions(amm=self.amm, config=self.config, starters=self.starters, cycle=cycle)
@@ -132,5 +132,5 @@ class App:
 
 
 if __name__ == '__main__':
-    app = App("terraswap")
+    app = App("osmosis")
     app.run()

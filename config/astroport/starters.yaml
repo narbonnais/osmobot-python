@@ -1,0 +1,7 @@
+uluna:
+    maximum_input: 20000000
+    current_price: 85.0
+
+uusd:
+    maximum_input: 20000000
+    current_price: 1.0
