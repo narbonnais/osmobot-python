@@ -122,17 +122,26 @@ def fetch_terraswap_dashboard_pairs(regenerate=True) -> List[Pool]:
     pools = []
     for dashboard_pair in dashboard_pairs:
 
-        if dashboard_pair.token0Volume == 0 or dashboard_pair.token1Volume == 0:
+        amount_token0 = dashboard_pair.token0Reserve*10**(-dashboard_pair.token0Decimals)
+        amount_token1 = dashboard_pair.token1Reserve*10**(-dashboard_pair.token1Decimals)
+
+        if amount_token0 < 1 or amount_token1 < 1:
             continue
 
-        asset_1 = Asset(symbol=dashboard_pair.token0Symbol, denom=dashboard_pair.token0)
-        asset_2 = Asset(symbol=dashboard_pair.token1Symbol, denom=dashboard_pair.token1)
+        if dashboard_pair.token0Volume < 1 or dashboard_pair.token1Volume < 1:
+            continue
+
+        if dashboard_pair.volumeUst < 1:
+            continue
+
+        asset_1 = Asset(symbol=dashboard_pair.token0Symbol+'_@'+dashboard_pair.token0, denom=dashboard_pair.token0)
+        asset_2 = Asset(symbol=dashboard_pair.token1Symbol+'_@'+dashboard_pair.token1, denom=dashboard_pair.token1)
 
         pools.append(Pool(idx=dashboard_pair.pairAddress, asset_1=asset_1, asset_2=asset_2, swap_fee=0.003,
-                          amount_in=dashboard_pair.token0Volume, amount_out=dashboard_pair.token1Volume, wi=1, wo=1))
+                          amount_in=amount_token0, amount_out=amount_token1, wi=1, wo=1))
 
         pools.append(Pool(idx=dashboard_pair.pairAddress, asset_1=asset_2, asset_2=asset_1, swap_fee=0.003,
-                          amount_in=dashboard_pair.token1Volume, amount_out=dashboard_pair.token0Volume, wi=1, wo=1))
+                          amount_in=amount_token1, amount_out=amount_token0, wi=1, wo=1))
 
     return pools
 

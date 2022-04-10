@@ -1,3 +1,6 @@
-Luna:
+UST_@uusd:
     maximum_input: 20000000
-    current_price: 86.00
+    current_price: 1.00
+Luna_@uluna:
+    maximum_input: 20000000
+    current_price: 84.00

@@ -44,7 +44,8 @@ def find_transactions(cycle, amm, config, starters):
         return transactions
 
     for pools in amm.all_pools_with_cycle(cycle):
-
+        if len(pools) == 0:
+            continue
         from_asset = cycle[0]
         best_input = find_optimal_amount(pools, xatol=config['xatol'], fatol=config['fatol'])
 

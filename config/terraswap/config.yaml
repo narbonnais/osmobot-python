@@ -1,9 +1,9 @@
-minimum_dollars_delta: 30000
+minimum_dollars_delta: 0.0001
 do_transactions: false
 regenerate_cycles: true
 regenerate_denom2symbol: true
 fees: 2700
-xatol: 10000
-fatol: 100
+xatol: 0.1
+fatol: 0.1
 account: "osmo123kgn90rmdcrhas5fu2anfvnyrhvgurlk7j4es"
 sleep_time: 1
